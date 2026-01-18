@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: materials_db
+      POSTGRES_USER: materials_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-materials_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5460}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U materials_user -d materials_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6390}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend/materials_search_api
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-5001}:5000"
+    volumes:
+      - ./backend/materials_search_api/src/database:/app/src/database
+    environment:
+      FLASK_APP: src/main.py
+      FLASK_RUN_HOST: 0.0.0.0
+      FLASK_ENV: ${FLASK_ENV:-development}
+      DATABASE_URL: postgresql://materials_user:${DB_PASSWORD:-materials_secret}@postgres:5432/materials_db
+      REDIS_URL: redis://redis:6379/0
+    command: python src/main.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/categories')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  celery_worker:
+    build:
+      context: ./backend/materials_search_api
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app worker --loglevel=info
+    volumes:
+      - ./backend/materials_search_api/src:/app/src
+    environment:
+      FLASK_APP: src/main.py
+      FLASK_ENV: ${FLASK_ENV:-development}
+      DATABASE_URL: postgresql://materials_user:${DB_PASSWORD:-materials_secret}@postgres:5432/materials_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery_beat:
+    build:
+      context: ./backend/materials_search_api
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app beat --loglevel=info
+    volumes:
+      - ./backend/materials_search_api/src:/app/src
+    environment:
+      FLASK_APP: src/main.py
+      FLASK_ENV: ${FLASK_ENV:-development}
+      DATABASE_URL: postgresql://materials_user:${DB_PASSWORD:-materials_secret}@postgres:5432/materials_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend/materials_search_ui
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3002}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
