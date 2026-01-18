@@ -1,5 +1,36 @@
+import { useCallback, useMemo, useRef, useEffect, useState } from 'react'
+import { FixedSizeGrid as Grid } from 'react-window'
 import { MaterialCard } from './MaterialCard'
 import { useSearch } from '../../contexts/SearchContext'
+
+const CARD_HEIGHT = 340
+const CARD_MIN_WIDTH = 320
+const GAP = 24
+
+function useGridDimensions(containerRef) {
+  const [dimensions, setDimensions] = useState({ width: 0, height: 600 })
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: Math.min(window.innerHeight - 300, 800)
+        })
+      }
+    }
+
+    updateDimensions()
+    const resizeObserver = new ResizeObserver(updateDimensions)
+    resizeObserver.observe(containerRef.current)
+
+    return () => resizeObserver.disconnect()
+  }, [containerRef])
+
+  return dimensions
+}
 
 export function MaterialGrid() {
   const {
@@ -12,6 +43,42 @@ export function MaterialGrid() {
     setCurrentPage,
     totalPages,
   } = useSearch()
+
+  const containerRef = useRef(null)
+  const { width, height } = useGridDimensions(containerRef)
+
+  const columnCount = useMemo(() => {
+    if (width === 0) return 1
+    return Math.max(1, Math.floor((width + GAP) / (CARD_MIN_WIDTH + GAP)))
+  }, [width])
+
+  const rowCount = useMemo(() => {
+    return Math.ceil(materials.length / columnCount)
+  }, [materials.length, columnCount])
+
+  const columnWidth = useMemo(() => {
+    if (columnCount === 0) return CARD_MIN_WIDTH
+    return (width - GAP * (columnCount - 1)) / columnCount
+  }, [width, columnCount])
+
+  const Cell = useCallback(({ columnIndex, rowIndex, style }) => {
+    const index = rowIndex * columnCount + columnIndex
+    if (index >= materials.length) return null
+
+    const material = materials[index]
+    return (
+      <div style={{
+        ...style,
+        left: style.left + (columnIndex > 0 ? GAP * columnIndex : 0),
+        top: style.top + (rowIndex > 0 ? GAP * rowIndex : 0),
+        width: columnWidth,
+        height: CARD_HEIGHT - GAP,
+        paddingRight: columnIndex < columnCount - 1 ? 0 : 0,
+      }}>
+        <MaterialCard material={material} />
+      </div>
+    )
+  }, [materials, columnCount, columnWidth])
 
   if (error) {
     return (
@@ -52,12 +119,30 @@ export function MaterialGrid() {
     )
   }
 
+  const useVirtualization = materials.length > 24
+
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {materials.map((material) => (
-          <MaterialCard key={material.id} material={material} />
-        ))}
+      <div ref={containerRef} className="w-full">
+        {useVirtualization && width > 0 ? (
+          <Grid
+            columnCount={columnCount}
+            columnWidth={columnWidth + GAP}
+            height={height}
+            rowCount={rowCount}
+            rowHeight={CARD_HEIGHT}
+            width={width}
+            className="scrollbar-thin scrollbar-thumb-gray-300"
+          >
+            {Cell}
+          </Grid>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {materials.map((material) => (
+              <MaterialCard key={material.id} material={material} />
+            ))}
+          </div>
+        )}
       </div>
 
       {totalPages > 1 && (

@@ -70,8 +70,16 @@ class MaterialSearchParams(BaseModel):
         default=SortOrder.asc,
         description="Sort order"
     )
-    page: int = Field(default=1, ge=1, description="Page number")
+    page: int = Field(default=1, ge=1, description="Page number (offset pagination)")
     per_page: int = Field(default=20, ge=1, le=100, description="Items per page")
+    cursor: Optional[str] = Field(
+        default=None,
+        description="Cursor for cursor-based pagination (base64 encoded)"
+    )
+    use_cursor: bool = Field(
+        default=False,
+        description="Use cursor-based pagination instead of offset"
+    )
 
     @field_validator("max_price")
     @classmethod

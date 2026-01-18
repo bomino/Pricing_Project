@@ -1,0 +1,1 @@
+export { PriceComparisonTable } from './PriceComparisonTable'

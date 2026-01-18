@@ -611,7 +611,7 @@ export function AdminPage() {
       </main>
 
       <Dialog open={showProviderDialog} onOpenChange={setShowProviderDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg bg-white">
           <DialogHeader>
             <DialogTitle>Add Data Provider</DialogTitle>
             <DialogDescription>
@@ -626,7 +626,7 @@ export function AdminPage() {
       </Dialog>
 
       <Dialog open={!!editingProvider} onOpenChange={() => setEditingProvider(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg bg-white">
           <DialogHeader>
             <DialogTitle>Edit Provider</DialogTitle>
             <DialogDescription>
@@ -644,7 +644,7 @@ export function AdminPage() {
       </Dialog>
 
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <DialogContent>
+        <DialogContent className="bg-white">
           <DialogHeader>
             <DialogTitle>Delete Provider</DialogTitle>
             <DialogDescription>

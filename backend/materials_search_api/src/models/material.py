@@ -55,12 +55,25 @@ if is_postgres:
     Material.search_vector = db.Column(TSVECTOR)
     Material.__table_args__ = (
         Index('ix_materials_search_vector', 'search_vector', postgresql_using='gin'),
+        Index('ix_materials_category', 'category'),
+        Index('ix_materials_price', 'price'),
+        Index('ix_materials_availability', 'availability'),
+        Index('ix_materials_supplier', 'supplier_id'),
+        Index('ix_materials_category_price', 'category', 'price'),
+        Index('ix_materials_name', 'name'),
+    )
+else:
+    Material.__table_args__ = (
+        Index('ix_materials_category', 'category'),
+        Index('ix_materials_price', 'price'),
+        Index('ix_materials_availability', 'availability'),
+        Index('ix_materials_supplier', 'supplier_id'),
     )
 
 
 class Supplier(db.Model):
     __tablename__ = 'suppliers'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
@@ -72,12 +85,18 @@ class Supplier(db.Model):
     state = db.Column(db.String(50))
     zip_code = db.Column(db.String(20))
     country = db.Column(db.String(50), default='USA')
-    service_areas = db.Column(db.JSON)  # Store service areas as JSON array
-    certifications = db.Column(db.JSON)  # Store certifications as JSON array
+    service_areas = db.Column(db.JSON)
+    certifications = db.Column(db.JSON)
     rating = db.Column(db.Float, default=0.0)
     total_reviews = db.Column(db.Integer, default=0)
     is_verified = db.Column(db.Boolean, default=False)
-    
+
+    __table_args__ = (
+        Index('ix_suppliers_rating', 'rating'),
+        Index('ix_suppliers_location', 'city', 'state'),
+        Index('ix_suppliers_name', 'name'),
+    )
+
     def to_dict(self):
         return {
             'id': self.id,

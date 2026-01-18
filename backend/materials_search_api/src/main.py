@@ -13,6 +13,7 @@ from flask_jwt_extended import JWTManager
 from pydantic import ValidationError
 from src.models.user import db
 from src.models.material import Material, Supplier, Project, PriceHistory, SupplierReview, DataProvider, PriceSource, SyncJob
+from src.models.quote import QuoteRequest
 from src.models.comparison import CanonicalMaterial, MaterialVariant
 from src.models.bom import BillOfMaterials, BOMItem
 from src.routes.user import user_bp
@@ -23,6 +24,7 @@ from src.routes.bom import bom_bp
 from src.routes.price_history import price_history_bp
 from src.routes.supplier_review import supplier_review_bp
 from src.routes.data_integration import data_integration_bp
+from src.routes.quotes import quotes_bp
 from src.auth.routes import auth_bp
 from src.config import config
 from src.cache import init_cache
@@ -59,6 +61,7 @@ app.register_blueprint(bom_bp, url_prefix='/api/v1')
 app.register_blueprint(price_history_bp, url_prefix='/api/v1')
 app.register_blueprint(supplier_review_bp, url_prefix='/api/v1')
 app.register_blueprint(data_integration_bp, url_prefix='/api/v1')
+app.register_blueprint(quotes_bp, url_prefix='/api/v1')
 
 app.register_blueprint(user_bp, url_prefix='/api', name='user_legacy')
 app.register_blueprint(materials_bp, url_prefix='/api', name='materials_legacy')
@@ -69,6 +72,7 @@ app.register_blueprint(bom_bp, url_prefix='/api', name='bom_legacy')
 app.register_blueprint(price_history_bp, url_prefix='/api', name='price_history_legacy')
 app.register_blueprint(supplier_review_bp, url_prefix='/api', name='supplier_review_legacy')
 app.register_blueprint(data_integration_bp, url_prefix='/api', name='data_integration_legacy')
+app.register_blueprint(quotes_bp, url_prefix='/api', name='quotes_legacy')
 
 db.init_app(app)
 with app.app_context():

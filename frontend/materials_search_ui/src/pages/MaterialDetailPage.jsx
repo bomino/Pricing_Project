@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ClipboardPlus } from 'lucide-react'
 import { PriceHistoryChart } from '@/components/materials/PriceHistoryChart'
+import { PriceComparisonTable } from '@/components/comparison'
 import { SupplierReviews } from '@/components/suppliers/SupplierReviews'
 import { AuthHeader } from '@/components/auth'
+import { FavoriteButton } from '@/components/favorites'
+import { AddToBOMDialog } from '@/components/bom'
 
 export function MaterialDetailPage() {
   const { id } = useParams()
@@ -11,6 +14,7 @@ export function MaterialDetailPage() {
   const [material, setMaterial] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [bomDialogOpen, setBomDialogOpen] = useState(false)
 
   useEffect(() => {
     const fetchMaterial = async () => {
@@ -100,7 +104,10 @@ export function MaterialDetailPage() {
             </div>
             <AuthHeader />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">{material.name}</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gray-900">{material.name}</h1>
+            <FavoriteButton materialId={material.id} size="large" />
+          </div>
         </div>
       </header>
 
@@ -144,6 +151,10 @@ export function MaterialDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="mt-8">
+              <PriceComparisonTable materialId={material.id} />
             </div>
 
             <div className="mt-8">
@@ -217,13 +228,25 @@ export function MaterialDetailPage() {
                 </div>
               )}
 
-              <button className="w-full mt-6 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                Request Quote
-              </button>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setBomDialogOpen(true)}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <ClipboardPlus className="h-5 w-5" />
+                  Add to BOM
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </main>
+
+      <AddToBOMDialog
+        material={material}
+        open={bomDialogOpen}
+        onOpenChange={setBomDialogOpen}
+      />
     </div>
   )
 }

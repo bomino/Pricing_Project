@@ -4,14 +4,20 @@ from flask_caching import Cache
 cache = Cache()
 
 def init_cache(app):
-    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    redis_url = os.environ.get('REDIS_URL')
 
-    cache_config = {
-        'CACHE_TYPE': 'redis',
-        'CACHE_REDIS_URL': redis_url,
-        'CACHE_DEFAULT_TIMEOUT': 300,
-        'CACHE_KEY_PREFIX': 'materials_'
-    }
+    if redis_url:
+        cache_config = {
+            'CACHE_TYPE': 'redis',
+            'CACHE_REDIS_URL': redis_url,
+            'CACHE_DEFAULT_TIMEOUT': 300,
+            'CACHE_KEY_PREFIX': 'materials_'
+        }
+    else:
+        cache_config = {
+            'CACHE_TYPE': 'SimpleCache',
+            'CACHE_DEFAULT_TIMEOUT': 300
+        }
 
     app.config.from_mapping(cache_config)
     cache.init_app(app)

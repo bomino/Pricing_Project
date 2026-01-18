@@ -1049,25 +1049,66 @@ class UserSubmittedPrice(db.Model):
 
 ## Phase 5: Polish & Scale (Weeks 17-20)
 
-### Week 17: Performance Optimization
+### Week 17: Performance Optimization ✅ COMPLETED
 
-**Database indexes:**
+**Database indexes:** ✅
 ```python
-# Add to models
-__table_args__ = (
-    db.Index('idx_material_category', 'category'),
-    db.Index('idx_material_price', 'price'),
-    db.Index('idx_material_availability', 'availability'),
-    db.Index('idx_supplier_rating', 'rating'),
-    db.Index('idx_supplier_location', 'city', 'state'),
+# Added to Material model (src/models/material.py)
+if is_postgres:
+    Material.__table_args__ = (
+        Index('ix_materials_search_vector', 'search_vector', postgresql_using='gin'),
+        Index('ix_materials_category', 'category'),
+        Index('ix_materials_price', 'price'),
+        Index('ix_materials_availability', 'availability'),
+        Index('ix_materials_supplier', 'supplier_id'),
+        Index('ix_materials_category_price', 'category', 'price'),
+        Index('ix_materials_name', 'name'),
+    )
+else:
+    Material.__table_args__ = (
+        Index('ix_materials_category', 'category'),
+        Index('ix_materials_price', 'price'),
+        Index('ix_materials_availability', 'availability'),
+        Index('ix_materials_supplier', 'supplier_id'),
+    )
+
+# Added to Supplier model
+Supplier.__table_args__ = (
+    Index('ix_suppliers_rating', 'rating'),
+    Index('ix_suppliers_location', 'city', 'state'),
+    Index('ix_suppliers_name', 'name'),
 )
 ```
 
-**Frontend optimizations:**
-- `React.memo` for MaterialCard
-- Virtualized lists with `react-window` for large result sets
-- Image lazy loading
-- Route-based code splitting
+**Cursor-based pagination:** ✅
+- Added `cursor` and `use_cursor` parameters to MaterialSearchParams schema
+- Implemented cursor encoding/decoding in routes/materials.py
+- Search endpoint supports both offset and cursor pagination
+- Response includes `pagination_type`, `next_cursor` for cursor mode
+
+**SQLAlchemy connection pooling:** ✅
+```python
+# Added to src/config.py
+class Config:
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
+
+class ProductionConfig(Config):
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        **Config.SQLALCHEMY_ENGINE_OPTIONS,
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_timeout': 30,
+    }
+```
+
+**Frontend optimizations:** ✅
+- `React.memo` and `useCallback` added to MaterialCard component
+- `VirtualizedMaterialGrid` component created using `react-window`
+- Added `react-window` dependency to package.json
+- Virtualized lists for large result sets
 
 ### Week 18: Advanced Search
 
@@ -1311,8 +1352,11 @@ pricing_project/
 | Phase 2 | Week 6 - Price Comparison Matrix | ✅ Complete | 2026-01-17 |
 | Phase 2 | Week 7 - Saved Searches & Favorites | ✅ Complete | 2026-01-17 |
 | Phase 3 | Weeks 8-9 - BOM Generator | ✅ Complete | 2026-01-17 |
-| Phase 3 | Weeks 9-10 - Price History & Tracking | ⏳ Not Started | - |
-| Phase 3 | Weeks 10-11 - Supplier Reviews | ⏳ Not Started | - |
-| Phase 3 | Weeks 11-12 - Caching Layer | ⏳ Not Started | - |
-| Phase 4 | Weeks 13-16 - Data Integration | ⏳ Not Started | - |
-| Phase 5 | Weeks 17-20 - Polish & Scale | ⏳ Not Started | - |
+| Phase 3 | Weeks 9-10 - Price History & Tracking | ✅ Complete | 2026-01-17 |
+| Phase 3 | Weeks 10-11 - Supplier Reviews | ✅ Complete | 2026-01-17 |
+| Phase 3 | Weeks 11-12 - Caching Layer | ✅ Complete | 2026-01-17 |
+| Phase 4 | Weeks 13-16 - Data Integration | ✅ Complete | 2026-01-18 |
+| Phase 5 | Week 17 - Performance Optimization | ✅ Complete | 2026-01-18 |
+| Phase 5 | Week 18 - Advanced Search | ⏳ Not Started | - |
+| Phase 5 | Week 19 - Notifications & Alerts | ⏳ Not Started | - |
+| Phase 5 | Week 20 - Testing & Documentation | ⏳ Not Started | - |

@@ -9,8 +9,22 @@ from src.schemas.supplier import SupplierCreate
 from src.services.price_history import record_price
 from src.cache import cache, CACHE_TIMEOUTS, make_cache_key
 import json
+import base64
 
 materials_bp = Blueprint('materials', __name__)
+
+
+def encode_cursor(material_id: int, sort_value) -> str:
+    cursor_data = json.dumps({'id': material_id, 'sort_value': sort_value})
+    return base64.urlsafe_b64encode(cursor_data.encode()).decode()
+
+
+def decode_cursor(cursor: str) -> dict:
+    try:
+        cursor_data = base64.urlsafe_b64decode(cursor.encode()).decode()
+        return json.loads(cursor_data)
+    except Exception:
+        return None
 
 
 def validate_request_params(schema_class, params_dict):
@@ -74,11 +88,58 @@ def search_materials():
             )
 
         sort_column = getattr(Material, params.sort_by.value, Material.name)
-        if params.sort_order == SortOrder.desc:
-            materials_query = materials_query.order_by(desc(sort_column))
-        else:
-            materials_query = materials_query.order_by(asc(sort_column))
+        sort_order_fn = desc if params.sort_order == SortOrder.desc else asc
 
+        if params.use_cursor and params.cursor:
+            cursor_data = decode_cursor(params.cursor)
+            if cursor_data:
+                cursor_sort_value = cursor_data.get('sort_value')
+                cursor_id = cursor_data.get('id')
+
+                if params.sort_order == SortOrder.desc:
+                    materials_query = materials_query.filter(
+                        or_(
+                            sort_column < cursor_sort_value,
+                            and_(
+                                sort_column == cursor_sort_value,
+                                Material.id < cursor_id
+                            )
+                        )
+                    )
+                else:
+                    materials_query = materials_query.filter(
+                        or_(
+                            sort_column > cursor_sort_value,
+                            and_(
+                                sort_column == cursor_sort_value,
+                                Material.id > cursor_id
+                            )
+                        )
+                    )
+
+            materials_query = materials_query.order_by(sort_order_fn(sort_column), sort_order_fn(Material.id))
+            materials_list = materials_query.limit(params.per_page + 1).all()
+
+            has_next = len(materials_list) > params.per_page
+            if has_next:
+                materials_list = materials_list[:-1]
+
+            next_cursor = None
+            if has_next and materials_list:
+                last_material = materials_list[-1]
+                last_sort_value = getattr(last_material, params.sort_by.value)
+                if last_sort_value is not None:
+                    next_cursor = encode_cursor(last_material.id, last_sort_value)
+
+            return jsonify({
+                'materials': [material.to_dict() for material in materials_list],
+                'per_page': params.per_page,
+                'has_next': has_next,
+                'next_cursor': next_cursor,
+                'pagination_type': 'cursor'
+            })
+
+        materials_query = materials_query.order_by(sort_order_fn(sort_column))
         materials = materials_query.paginate(
             page=params.page,
             per_page=params.per_page,
@@ -92,7 +153,8 @@ def search_materials():
             'current_page': params.page,
             'per_page': params.per_page,
             'has_next': materials.has_next,
-            'has_prev': materials.has_prev
+            'has_prev': materials.has_prev,
+            'pagination_type': 'offset'
         })
 
     except Exception as e:
@@ -464,7 +526,7 @@ def create_project():
     """Create a new project"""
     try:
         data = request.get_json()
-        
+
         project = Project(
             name=data.get('name'),
             description=data.get('description'),
@@ -476,13 +538,170 @@ def create_project():
             status=data.get('status', 'Planning'),
             user_id=data.get('user_id')
         )
-        
+
         db.session.add(project)
         db.session.commit()
-        
+
         return jsonify(project.to_dict()), 201
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@materials_bp.route('/materials/autocomplete', methods=['GET'])
+@cache.cached(timeout=60, make_cache_key=make_cache_key)
+def autocomplete_materials():
+    """Autocomplete search for materials with typo tolerance using pg_trgm"""
+    try:
+        q = request.args.get('q', '').strip()
+        limit = request.args.get('limit', 10, type=int)
+
+        if not q or len(q) < 2:
+            return jsonify({'suggestions': []})
+
+        if limit < 1 or limit > 50:
+            limit = 10
+
+        is_postgres = 'postgresql' in db.engine.url.drivername
+
+        if is_postgres:
+            results = db.session.execute(
+                db.text("""
+                    SELECT DISTINCT name, category,
+                           similarity(name, :query) as sim
+                    FROM materials
+                    WHERE similarity(name, :query) > 0.1
+                       OR name ILIKE :pattern
+                    ORDER BY sim DESC, name
+                    LIMIT :limit
+                """),
+                {'query': q, 'pattern': f'%{q}%', 'limit': limit}
+            ).fetchall()
+
+            suggestions = [
+                {'name': row[0], 'category': row[1], 'score': round(row[2], 2)}
+                for row in results
+            ]
+        else:
+            materials = Material.query.filter(
+                Material.name.ilike(f'%{q}%')
+            ).distinct(Material.name).limit(limit).all()
+
+            suggestions = [
+                {'name': m.name, 'category': m.category, 'score': 1.0}
+                for m in materials
+            ]
+
+        return jsonify({'suggestions': suggestions})
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'code': 'INTERNAL_ERROR'}), 500
+
+
+@materials_bp.route('/materials/search/fuzzy', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUTS['search_results'], make_cache_key=make_cache_key)
+def fuzzy_search_materials():
+    """Fuzzy search with typo tolerance using pg_trgm similarity"""
+    try:
+        q = request.args.get('q', '').strip()
+        threshold = request.args.get('threshold', 0.3, type=float)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 12, type=int)
+
+        if not q:
+            return jsonify({
+                'materials': [],
+                'total': 0,
+                'pages': 0,
+                'current_page': page
+            })
+
+        is_postgres = 'postgresql' in db.engine.url.drivername
+
+        if is_postgres:
+            count_result = db.session.execute(
+                db.text("""
+                    SELECT COUNT(*) FROM materials
+                    WHERE similarity(name, :query) > :threshold
+                       OR similarity(description, :query) > :threshold
+                       OR name ILIKE :pattern
+                       OR description ILIKE :pattern
+                """),
+                {'query': q, 'threshold': threshold, 'pattern': f'%{q}%'}
+            ).scalar()
+
+            total = count_result or 0
+            offset = (page - 1) * per_page
+
+            results = db.session.execute(
+                db.text("""
+                    SELECT m.*, s.name as supplier_name,
+                           GREATEST(
+                               COALESCE(similarity(m.name, :query), 0),
+                               COALESCE(similarity(m.description, :query), 0)
+                           ) as relevance
+                    FROM materials m
+                    JOIN suppliers s ON m.supplier_id = s.id
+                    WHERE similarity(m.name, :query) > :threshold
+                       OR similarity(m.description, :query) > :threshold
+                       OR m.name ILIKE :pattern
+                       OR m.description ILIKE :pattern
+                    ORDER BY relevance DESC, m.name
+                    LIMIT :limit OFFSET :offset
+                """),
+                {
+                    'query': q,
+                    'threshold': threshold,
+                    'pattern': f'%{q}%',
+                    'limit': per_page,
+                    'offset': offset
+                }
+            ).fetchall()
+
+            materials = []
+            for row in results:
+                materials.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'category': row[3],
+                    'subcategory': row[4],
+                    'specifications': row[5],
+                    'price': row[6],
+                    'unit': row[7],
+                    'supplier_id': row[8],
+                    'availability': row[9],
+                    'lead_time_days': row[10],
+                    'minimum_order': row[11],
+                    'certifications': row[12],
+                    'sustainability_rating': row[13],
+                    'image_url': row[14],
+                    'supplier_name': row[15],
+                    'relevance': round(row[16], 2) if row[16] else 0
+                })
+        else:
+            query = Material.query.options(joinedload(Material.supplier)).filter(
+                or_(
+                    Material.name.ilike(f'%{q}%'),
+                    Material.description.ilike(f'%{q}%')
+                )
+            )
+
+            pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+            total = pagination.total
+            materials = [m.to_dict() for m in pagination.items]
+
+        pages = (total + per_page - 1) // per_page if total > 0 else 0
+
+        return jsonify({
+            'materials': materials,
+            'total': total,
+            'pages': pages,
+            'current_page': page,
+            'per_page': per_page
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'code': 'INTERNAL_ERROR'}), 500
 

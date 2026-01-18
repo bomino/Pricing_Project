@@ -1,3 +1,6 @@
 export { SearchPage } from './SearchPage'
 export { MaterialDetailPage } from './MaterialDetailPage'
 export { AdminPage } from './AdminPage'
+export { FavoritesPage } from './FavoritesPage'
+export { BOMPage } from './BOMPage'
+export { BOMDetailPage } from './BOMDetailPage'

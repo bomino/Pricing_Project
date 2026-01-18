@@ -121,6 +121,33 @@ export function SearchProvider({ children }) {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
   }, [])
 
+  const applySearchParams = useCallback((params) => {
+    if (params.q !== undefined) setSearchQuery(params.q || '')
+    if (params.category !== undefined) setSelectedCategory(params.category || '')
+    if (params.min_price !== undefined || params.max_price !== undefined) {
+      setPriceRange({
+        min: params.min_price || '',
+        max: params.max_price || ''
+      })
+    }
+    if (params.supplier_id !== undefined) setSelectedSupplier(params.supplier_id || '')
+    if (params.availability !== undefined) setAvailabilityFilter(params.availability || '')
+    if (params.sort_by !== undefined) setSortBy(params.sort_by || 'name')
+    if (params.sort_order !== undefined) setSortOrder(params.sort_order || 'asc')
+    setCurrentPage(1)
+  }, [])
+
+  const getCurrentQueryParams = useCallback(() => ({
+    q: debouncedSearchQuery || undefined,
+    category: selectedCategory || undefined,
+    min_price: priceRange.min || undefined,
+    max_price: priceRange.max || undefined,
+    supplier_id: selectedSupplier || undefined,
+    availability: availabilityFilter || undefined,
+    sort_by: sortBy !== 'name' ? sortBy : undefined,
+    sort_order: sortOrder !== 'asc' ? sortOrder : undefined
+  }), [debouncedSearchQuery, selectedCategory, priceRange, selectedSupplier, availabilityFilter, sortBy, sortOrder])
+
   const suppliers = [...new Set(materials.map(m => m.supplier_name))].filter(Boolean)
 
   const value = {
@@ -151,6 +178,8 @@ export function SearchProvider({ children }) {
     clearFilters,
     toggleSortOrder,
     fetchMaterials,
+    applySearchParams,
+    getCurrentQueryParams,
     SORT_OPTIONS,
   }
 

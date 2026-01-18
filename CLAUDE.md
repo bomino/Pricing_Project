@@ -93,6 +93,8 @@ pricing_project/
 - `GET /materials/<id>` - Material details
 - `GET /materials/<id>/compare` - Price comparison across suppliers
 - `GET /materials/<id>/price-history` - Historical prices
+- `GET /materials/autocomplete?q=...&limit=10` - Autocomplete with typo tolerance (pg_trgm)
+- `GET /materials/search/fuzzy?q=...&threshold=0.3` - Fuzzy search with similarity ranking
 
 ### Data Integration (`/api/v1`)
 - `GET /providers` - List data providers
@@ -257,6 +259,35 @@ npm run dev
 | `sync_full_catalog` | Daily at 2 AM | Full catalog sync from all providers |
 | `cleanup_expired_prices` | Every 6 hours | Mark expired price sources as invalid |
 
+## Testing
+
+### Test Suites
+
+| Suite | Location | Status | Notes |
+|-------|----------|--------|-------|
+| E2E API Tests | `tests/e2e_test.py` | 27/27 PASS | Full API coverage |
+| Stress Tests | `tests/stress_test_sync.py` | 6/6 PASS | Sync system load testing |
+
+### Running Tests
+
+```bash
+# Start services first
+docker-compose up -d postgres redis
+cd backend/materials_search_api
+python src/main.py &                              # Backend
+celery -A src.celery_app worker --pool=solo &     # Celery (Windows)
+
+# Run E2E tests
+python tests/e2e_test.py
+
+# Run stress tests
+python tests/stress_test_sync.py
+```
+
+### Test Reports
+- `tests/E2E_TEST_REPORT.md` - API endpoint coverage, response times
+- `tests/STRESS_TEST_REPORT.md` - Sync throughput, concurrent operations
+
 ## Implementation Status
 
 ### Completed
@@ -272,12 +303,17 @@ npm run dev
   - [x] RSMeans API adapter (Tier 1)
   - [x] SerpApi adapter - Home Depot, Lowe's, Google Shopping (Tier 1)
   - [x] Playwright scraper adapter - Grainger, McMaster-Carr (Tier 3)
+- [x] Phase 4: E2E Testing (27 tests, 100% pass rate)
+- [x] Phase 4: Stress Testing (sync system verified)
+
+### Completed (continued)
+- [x] Phase 5: Performance (DB indexes existed, cursor pagination existed, virtualization with react-window)
+- [x] Phase 5: Advanced search (pg_trgm extension, trigram indexes, autocomplete, fuzzy search)
+- [x] Phase 6: Frontend UI (Favorites, Price Comparison, BOM, Saved Searches)
 
 ### Pending
-- [ ] Phase 5: Performance (DB indexes, cursor pagination, connection pooling)
-- [ ] Phase 5: Advanced search (synonyms, typo tolerance via pg_trgm, autocomplete)
 - [ ] Phase 5: Notifications (price alerts, email notifications)
-- [ ] Phase 5: Testing (pytest 80% coverage, Vitest, OpenAPI/Swagger docs)
+- [ ] Phase 5: Unit Testing (pytest 80% coverage, Vitest, OpenAPI/Swagger docs)
 
 ## Key Files to Modify
 

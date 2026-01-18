@@ -1,3 +1,5 @@
 export { SearchBar } from './SearchBar'
 export { FilterPanel } from './FilterPanel'
 export { SortSelect } from './SortSelect'
+export { SaveSearchButton } from './SaveSearchButton'
+export { SavedSearchList } from './SavedSearchList'

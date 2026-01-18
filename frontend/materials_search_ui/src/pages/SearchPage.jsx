@@ -1,10 +1,10 @@
-import { SearchBar, FilterPanel, SortSelect } from '../components/search'
+import { SearchBar, FilterPanel, SortSelect, SaveSearchButton, SavedSearchList } from '../components/search'
 import { MaterialGrid } from '../components/materials'
 import { AuthHeader } from '../components/auth'
 import { useSearch } from '../contexts/SearchContext'
 
 export function SearchPage() {
-  const { totalMaterials, loading, debouncedSearchQuery } = useSearch()
+  const { totalMaterials, loading, debouncedSearchQuery, getCurrentQueryParams, applySearchParams } = useSearch()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -40,7 +40,11 @@ export function SearchPage() {
               <p className="text-gray-600">Results for "{debouncedSearchQuery}"</p>
             )}
           </div>
-          <SortSelect />
+          <div className="flex items-center gap-2">
+            <SaveSearchButton queryParams={getCurrentQueryParams()} />
+            <SavedSearchList onApplySearch={applySearchParams} />
+            <SortSelect />
+          </div>
         </div>
 
         <MaterialGrid />

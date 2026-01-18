@@ -287,6 +287,30 @@ BACKEND_PORT=5001
 FRONTEND_PORT=3002
 ```
 
+## Testing
+
+### Running Tests
+
+```bash
+# E2E API Tests (requires backend running)
+cd backend/materials_search_api
+python tests/e2e_test.py
+
+# Stress Tests (requires Celery worker running)
+python tests/stress_test_sync.py
+```
+
+### Test Reports
+
+| Test Suite | Status | Coverage |
+|------------|--------|----------|
+| E2E API Tests | 27/27 PASS (100%) | Auth, Search, BOM, Price, Quotes, Errors |
+| Stress Tests | 6/6 PASS (100%) | Concurrent sync, volume, error recovery |
+
+See detailed reports:
+- [E2E Test Report](backend/materials_search_api/tests/E2E_TEST_REPORT.md)
+- [Stress Test Report](backend/materials_search_api/tests/STRESS_TEST_REPORT.md)
+
 ## Implementation Status
 
 ### Completed
@@ -294,12 +318,14 @@ FRONTEND_PORT=3002
 - [x] Phase 2: Core Features (PostgreSQL, auth, price comparison)
 - [x] Phase 3: Advanced Features (BOM, price history, reviews, caching)
 - [x] Phase 4: Data Integration (models, Celery, provider adapters, admin panel)
+- [x] Phase 4: E2E Testing (27 tests covering all API endpoints)
+- [x] Phase 4: Stress Testing (sync system load testing)
 
 ### Pending
 - [ ] Phase 5: Performance optimizations (DB indexes, pagination, connection pooling)
 - [ ] Phase 5: Advanced search (synonyms, typo tolerance, autocomplete)
 - [ ] Phase 5: Notifications (price alerts, email notifications)
-- [ ] Phase 5: Testing (pytest 80% coverage, Vitest, OpenAPI docs)
+- [ ] Phase 5: Unit Testing (pytest 80% coverage, Vitest, OpenAPI docs)
 
 ## Contributing
 
